@@ -20,10 +20,15 @@ class BiLSTM(nn.Module):
         self.lin = nn.Linear(2*hidden_size, out_size)
 
     def forward(self, sents_tensor, lengths):
+        #词嵌入,获取向量列表
         emb = self.embedding(sents_tensor)  # [B, L, emb_size]
 
+        #lengths表示句子原始长度，调用pack_padded_sequence告知torch删除填充的数据，以免影响训练
+        #参考链接：https://www.cnblogs.com/sbj123456789/p/9834018.html
         packed = pack_padded_sequence(emb, lengths, batch_first=True)
         rnn_out, _ = self.bilstm(packed)
+        # 由于是双向lstm，因此hidden层会生成两个out，最后会拼接在一起
+        #参考链接：https://zhuanlan.zhihu.com/p/47802053
         # rnn_out:[B, L, hidden_size*2]
         rnn_out, _ = pad_packed_sequence(rnn_out, batch_first=True)
 
@@ -32,7 +37,6 @@ class BiLSTM(nn.Module):
         return scores
 
     def test(self, sents_tensor, lengths, _):
-        """第三个参数不会用到，加它是为了与BiLSTM_CRF保持同样的接口"""
         logits = self.forward(sents_tensor, lengths)  # [B, L, out_size]
         _, batch_tagids = torch.max(logits, dim=2)
 

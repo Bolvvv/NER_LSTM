@@ -1,6 +1,6 @@
 from processing_data import build_corpus
 from utils import extend_maps, prepocess_data_for_lstmcrf
-from evaluate import bilstm_train_and_eval, ensemble_evaluate
+from evaluate import bilstm_train_and_eval
 def main():
     # 读取数据
     print("读取数据...")
@@ -11,18 +11,12 @@ def main():
     # 训练评估BI-LSTM模型
     print("正在训练评估双向LSTM模型...")
     # LSTM模型训练的时候需要在word2id和tag2id加入PAD和UNK
-    bilstm_word2id, bilstm_tag2id = extend_maps(word2id, tag2id, for_crf=False)
+    bilstm_word2id, bilstm_tag2id = extend_maps(word2id, tag2id)
     lstm_pred = bilstm_train_and_eval(
         (train_word_lists, train_tag_lists),
         (dev_word_lists, dev_tag_lists),
         (test_word_lists, test_tag_lists),
-        bilstm_word2id, bilstm_tag2id,
-        crf=False
-    )
-
-    ensemble_evaluate(
-        [lstm_pred],
-        test_tag_lists
+        bilstm_word2id, bilstm_tag2id
     )
 
 if __name__ == "__main__":

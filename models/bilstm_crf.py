@@ -5,18 +5,18 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from .util import tensorized, sort_by_lengths, cal_loss, cal_lstm_crf_loss
+from .util import tensorized, sort_by_lengths, cal_loss
 from .config import TrainingConfig, LSTMConfig
 from .bilstm import BiLSTM
 
 
 class BILSTM_Model(object):
-    def __init__(self, vocab_size, out_size, crf=False):
+    def __init__(self, vocab_size, out_size):
         """功能：对LSTM的模型进行训练与测试
            参数:
             vocab_size:词典大小
             out_size:标注种类
-            crf选择是否添加CRF层"""
+        """
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
 
@@ -24,18 +24,15 @@ class BILSTM_Model(object):
         self.emb_size = LSTMConfig.emb_size
         self.hidden_size = LSTMConfig.hidden_size
 
-        self.crf = crf
-        # 根据是否添加crf初始化不同的模型 选择不一样的损失计算函数
-        if not crf:
-            self.model = BiLSTM(vocab_size, self.emb_size,
-                                self.hidden_size, out_size).to(self.device)
-            self.cal_loss_func = cal_loss
+        self.model = BiLSTM(vocab_size, self.emb_size,
+                            self.hidden_size, out_size).to(self.device)
+        self.cal_loss_func = cal_loss
 
         # 加载训练参数：
         self.epoches = TrainingConfig.epoches
         self.print_step = TrainingConfig.print_step
         self.lr = TrainingConfig.lr
-        self.batch_size = TrainingConfig.batch_size
+        self.batch_size = TrainingConfig.batch_size#设置一次训练多少个句子
 
         # 初始化优化器
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
@@ -50,14 +47,14 @@ class BILSTM_Model(object):
               word2id, tag2id):
         # 对数据集按照长度进行排序
         word_lists, tag_lists, _ = sort_by_lengths(word_lists, tag_lists)
-        dev_word_lists, dev_tag_lists, _ = sort_by_lengths(
-            dev_word_lists, dev_tag_lists)
+        dev_word_lists, dev_tag_lists, _ = sort_by_lengths(dev_word_lists, dev_tag_lists)
 
         B = self.batch_size
         for e in range(1, self.epoches+1):
             self.step = 0
             losses = 0.
             for ind in range(0, len(word_lists), B):
+                #将数据根据B的大小分组
                 batch_sents = word_lists[ind:ind+B]
                 batch_tags = tag_lists[ind:ind+B]
 
@@ -82,8 +79,10 @@ class BILSTM_Model(object):
         self.model.train()
         self.step += 1
         # 准备数据
+        #将每一个batch里面的句子填充为最长句子的长度，同时tensor化
         tensorized_sents, lengths = tensorized(batch_sents, word2id)
         tensorized_sents = tensorized_sents.to(self.device)
+        #将每一个batch里面的每一个句子对应的tag填充为最长句子对应的tag的长度，同时tensor化
         targets, lengths = tensorized(batch_tags, tag2id)
         targets = targets.to(self.device)
 
@@ -108,8 +107,7 @@ class BILSTM_Model(object):
                 # 准备batch数据
                 batch_sents = dev_word_lists[ind:ind+self.batch_size]
                 batch_tags = dev_tag_lists[ind:ind+self.batch_size]
-                tensorized_sents, lengths = tensorized(
-                    batch_sents, word2id)
+                tensorized_sents, lengths = tensorized(batch_sents, word2id)
                 tensorized_sents = tensorized_sents.to(self.device)
                 targets, lengths = tensorized(batch_tags, tag2id)
                 targets = targets.to(self.device)
@@ -118,8 +116,7 @@ class BILSTM_Model(object):
                 scores = self.model(tensorized_sents, lengths)
 
                 # 计算损失
-                loss = self.cal_loss_func(
-                    scores, targets, tag2id).to(self.device)
+                loss = self.cal_loss_func(scores, targets, tag2id).to(self.device)
                 val_losses += loss.item()
             val_loss = val_losses / val_step
 
@@ -147,12 +144,8 @@ class BILSTM_Model(object):
         id2tag = dict((id_, tag) for tag, id_ in tag2id.items())
         for i, ids in enumerate(batch_tagids):
             tag_list = []
-            if self.crf:
-                for j in range(lengths[i] - 1):  # crf解码过程中，end被舍弃
-                    tag_list.append(id2tag[ids[j].item()])
-            else:
-                for j in range(lengths[i]):
-                    tag_list.append(id2tag[ids[j].item()])
+            for j in range(lengths[i]):
+                tag_list.append(id2tag[ids[j].item()])
             pred_tag_lists.append(tag_list)
 
         # indices存有根据长度排序后的索引映射的信息

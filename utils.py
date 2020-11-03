@@ -24,17 +24,11 @@ def load_model(file_name):
 
 # LSTM模型训练的时候需要在word2id和tag2id加入PAD和UNK
 # 如果是加了CRF的lstm还要加入<start>和<end> (解码的时候需要用到)
-def extend_maps(word2id, tag2id, for_crf=True):
+def extend_maps(word2id, tag2id):
     word2id['<unk>'] = len(word2id)#UNK用来替代语料中未出现过的单词
     word2id['<pad>'] = len(word2id)#PAD用来做句子填补，在RNN中需要对sentences的大小进行固定，如果句子短于此，那么就需要填补
     tag2id['<unk>'] = len(tag2id)
     tag2id['<pad>'] = len(tag2id)
-    # 如果是加了CRF的bilstm  那么还要加入<start> 和 <end>token
-    if for_crf:
-        word2id['<start>'] = len(word2id)
-        word2id['<end>'] = len(word2id)
-        tag2id['<start>'] = len(tag2id)
-        tag2id['<end>'] = len(tag2id)
 
     return word2id, tag2id
 
